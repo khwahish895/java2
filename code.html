@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetch Last Email from Gmail</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #email-content {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fetch Last Email from Gmail</h1>
+    <button id="authorize-button">Authorize Gmail</button>
+    <div id="email-content">
+        <h2>Last Email</h2>
+        <p><strong>From:</strong> <span id="email-sender"></span></p>
+        <p><strong>Date:</strong> <span id="email-date"></span></p>
+        <p><strong>Subject:</strong> <span id="email-subject"></span></p>
+        <p><strong>Body:</strong> <span id="email-body"></span></p>
+    </div>
+
+    <script>
+        const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com'; // Replace with your client ID
+        const API_KEY = 'YOUR_API_KEY'; // Replace with your API key
+        const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest"];
+        const SCOPES = "https://www.googleapis.com/auth/gmail.readonly";
+
+        document.getElementById('authorize-button').onclick = handleAuthClick;
+
+        function handleClientLoad() {
+            gapi.load("client:auth2", initClient);
+        }
+
+        function initClient() {
+            gapi.client.init({
+                apiKey: API_KEY,
+                clientId: CLIENT_ID,
+                discoveryDocs: DISCOVERY_DOCS,
+                scope: SCOPES
+            }).then(() => {
+                gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+                updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+            }, (error) => {
+                console.error("Error initializing Google API client:", error);
+            });
+        }
+
+        function updateSigninStatus(isSignedIn) {
+            if (isSignedIn) {
+                fetchLastEmail();
+            }
+        }
+
+        function handleAuthClick() {
+            gapi.auth2.getAuthInstance().signIn();
+        }
+
+        function fetchLastEmail() {
+            gapi.client.gmail.users.messages.list({
+                'userId': 'me',
+                'maxResults': 1,
+                'labelIds': 'INBOX'
+            }).then((response) => {
+                const messages = response.result.messages;
+                if (messages && messages.length > 0) {
+                    const messageId = messages[0].id;
+                    getMessageDetails(messageId);
+                } else {
+                    console.log("No messages found.");
+                }
+            }).catch((error) => {
+                console.error("Error fetching messages:", error);
+            });
+        }
+
+        function getMessageDetails(messageId) {
+            gapi.client.gmail.users.messages.get({
+                'userId': 'me',
+                'id': messageId,
+                'format': 'full'
+            }).then((response) => {
+                const message = response.result;
+                const headers = message.payload.headers;
+
+                const fromHeader = headers.find(header => header.name === 'From');
+                const dateHeader = headers.find(header => header.name === 'Date');
+                const subjectHeader = headers.find(header => header.name === 'Subject');
+
+                document.getElementById('email-sender').textContent = fromHeader ? fromHeader.value : 'N/A';
+                document.getElementById('email-date').textContent = dateHeader ? dateHeader.value : 'N/A';
+                document.getElementById('email-subject').textContent = subjectHeader ? subjectHeader.value : 'N/A';
+                document.getElementById('email-body').textContent = message.snippet;
+
+                document.getElementById('email-content').style.display = 'block';
+            }).catch((error) => {
+                console.error("Error fetching message details:", error);
+            });
+        }
+
+        handleClientLoad();
+    </script>
+</body>
+</html>

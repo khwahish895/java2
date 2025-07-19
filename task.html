@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Web Utility App</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #00ffff, #ff99ff);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    h1 {
+      margin: 20px;
+      color: #333;
+      font-size: 2.5rem;
+      text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    video, canvas, img {
+      width: 100%;
+      max-width: 500px;
+      margin: 10px 0;
+      border-radius: 12px;
+      border: 4px solid #fff;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    button {
+      padding: 12px 24px;
+      margin: 10px 6px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(45deg, #00ffff, #ff99ff);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(45deg, #ff99ff, #00ffff);
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    #map {
+      width: 90%;
+      height: 400px;
+      max-width: 600px;
+      margin: 20px auto;
+      border: 4px solid #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    #geoLocationResult,
+    #ip-location-result,
+    #recommendation {
+      font-size: 1.1rem;
+      margin: 10px 0;
+      padding: 10px;
+      background: #ffffff80;
+      border-radius: 10px;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    input[type="text"],
+    input[type="search"],
+    input[type="url"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="password"],
+    input#destination {
+      padding: 10px 16px;
+      margin: 10px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      width: 80%;
+      max-width: 400px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    div[onclick^="viewProduct"] {
+      background: #fff;
+      padding: 16px 24px;
+      margin: 10px 0;
+      width: 80%;
+      max-width: 400px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1.1rem;
+      transition: background 0.3s ease, transform 0.2s ease;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    }
+
+    div[onclick^="viewProduct"]:hover {
+      background: #f0f0f0;
+      transform: translateY(-2px);
+    }
+
+    @media screen and (max-width: 600px) {
+      h1 {
+        font-size: 2rem;
+      }
+
+      button {
+        font-size: 0.9rem;
+        padding: 10px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+<h1>Smart Web Utility Dashboard</h1>
+
+  <!-- Webcam Capture -->
+  <video id="video" autoplay></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <img id="photo" src="" alt="Captured Photo" /><br>
+  <button onclick="capturePhoto()">📷 Capture Photo</button>
+  <button onclick="sendPhotoEmail()">📧 Send Photo via Email</button>
+
+  <!-- Video Recorder -->
+  <video id="recordedVideo" controls style="display:none;"></video>
+  <button onclick="startRecording()">⏺️ Start Video Recording</button>
+  <button onclick="stopRecording()">⏹️ Stop & Send Video</button>
+
+  <!-- WhatsApp, SMS -->
+  <button onclick="sendWhatsApp()">🟢 Send WhatsApp Message</button>
+  <button onclick="sendSMS()">📲 Send SMS via API</button>
+
+  <!-- Geolocation & IP -->
+  <button onclick="getGeoLocation()">📡 Get Current Location</button>
+  <button onclick="getIPLocation()">🌐 Get IP & Location</button>
+  <p id="geoLocationResult"></p>
+  <p id="ip-location-result"></p>
+
+  <!-- Google Maps -->
+  <input id="destination" placeholder="Enter destination" />
+  <button onclick="initMapWithLocation()">📍 Show My Location on Map</button>
+  <button onclick="showRoute()">🗺️ Show Route</button>
+  <button onclick="findGroceryStores()">🛒 Find Nearby Grocery Stores</button>
+  <div id="map"></div>
+
+  <!-- Gmail -->
+  <button onclick="initGmailAPI()">📨 Fetch Last Gmail</button>
+
+  <!-- Social Media -->
+  <button onclick="shareToTwitter()">🐦 Share to Twitter</button>
+
+  <!-- Product Views -->
+  <div onclick="viewProduct('Product A')">🛍️ Product A</div>
+  <div onclick="viewProduct('Product B')">🛍️ Product B</div>
+  <div onclick="viewProduct('Product C')">🛍️ Product C</div>
+  <h3 id="recommendation"></h3>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_API_KEY&libraries=places"></script>
+  <script>
+    emailjs.init("YOUR_EMAILJS_PUBLIC_KEY");
+
+    let mediaRecorder, recordedChunks = [];
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      video.srcObject = stream;
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        recordedVideo.src = url;
+        recordedVideo.style.display = 'block';
+      };
+    });
+
+    function capturePhoto() {
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      photo.src = canvas.toDataURL('image/png');
+    }
+
+    function sendPhotoEmail() {
+      emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ID", {
+        photo_base64: photo.src
+      }).then(() => alert("✅ Photo sent!"));
+    }
+
+    function startRecording() {
+      recordedChunks = [];
+      mediaRecorder.start();
+      alert("Recording started");
+    }
+    function stopRecording() {
+      mediaRecorder.stop();
+    }
+
+    function sendWhatsApp() {
+      const message = encodeURIComponent("Hello from Smart App!");
+      window.open(`https://wa.me/917424988589?text=${message}`);
+    }
+
+    function sendSMS() {
+      fetch("http://localhost:3000/send-sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: "+917424988589", message: "Test SMS" })
+      }).then(res => res.json()).then(data => alert("✅ SMS sent!"));
+    }
+
+    function getGeoLocation() {
+      navigator.geolocation.getCurrentPosition(pos => {
+        document.getElementById("geoLocationResult").innerText =
+          `Latitude: ${pos.coords.latitude}, Longitude: ${pos.coords.longitude}`;
+      });
+    }
+
+    function getIPLocation() {
+      fetch("http://ip-api.com/json/").then(res => res.json()).then(data => {
+        document.getElementById("ip-location-result").innerText =
+          `Your IP is ${data.query}, location: ${data.city}, ${data.regionName}, ${data.country}`;
+      });
+    }
+
+    let map, marker;
+    function initMapWithLocation() {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        map = new google.maps.Map(document.getElementById("map"), { zoom: 15, center: loc });
+        marker = new google.maps.Marker({ map, position: loc });
+      });
+    }
+
+    function showRoute() {
+      const dest = document.getElementById("destination").value;
+      navigator.geolocation.getCurrentPosition(pos => {
+        const directionsService = new google.maps.DirectionsService();
+        const directionsRenderer = new google.maps.DirectionsRenderer();
+        directionsRenderer.setMap(map);
+        directionsService.route({
+          origin: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          destination: dest,
+          travelMode: 'DRIVING'
+        }, (result, status) => {
+          if (status === 'OK') directionsRenderer.setDirections(result);
+        });
+      });
+    }
+
+    function findGroceryStores() {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const service = new google.maps.places.PlacesService(map);
+        service.nearbySearch({ location: loc, radius: 1500, type: ['grocery_or_supermarket'] }, (results, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK) {
+            results.forEach(place => {
+              new google.maps.Marker({ map, position: place.geometry.location, title: place.name });
+            });
+          }
+        });
+      });
+    }
+
+    function initGmailAPI() {
+      gapi.load("client:auth2", () => {
+        gapi.client.init({
+          apiKey: "YOUR_API_KEY",
+          clientId: "YOUR_CLIENT_ID",
+          discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest"],
+          scope: "https://www.googleapis.com/auth/gmail.readonly"
+        }).then(() => gapi.auth2.getAuthInstance().signIn()).then(() => {
+          gapi.client.gmail.users.messages.list({ userId: "me", maxResults: 1 }).then(res => {
+            const id = res.result.messages[0].id;
+            gapi.client.gmail.users.messages.get({ userId: "me", id }).then(email => {
+              alert("Last Email: " + email.result.snippet);
+            });
+          });
+        });
+      });
+    }
+
+    function shareToTwitter() {
+      const text = encodeURIComponent("Check out this awesome smart app!");
+      window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
+    }
+
+    const viewStartTimes = {};
+    function viewProduct(name) {
+      const now = Date.now();
+      viewStartTimes[name] = now;
+      setTimeout(() => {
+        const endTime = Date.now();
+        const duration = Math.floor((endTime - viewStartTimes[name]) / 1000);
+        const views = JSON.parse(localStorage.getItem("productViews") || "{}");
+        if (!views[name]) views[name] = { count: 0, totalTime: 0 };
+        views[name].count++;
+        views[name].totalTime += duration;
+        localStorage.setItem("productViews", JSON.stringify(views));
+        showRecommendation();
+      }, 3000);
+    }
+
+    function showRecommendation() {
+      const views = JSON.parse(localStorage.getItem("productViews") || "{}");
+      let recommended = '', maxScore = 0;
+      for (let p in views) {
+        const score = views[p].count * 2 + views[p].totalTime;
+        if (score > maxScore) { recommended = p; maxScore = score; }
+      }
+      document.getElementById("recommendation").innerText = recommended ? `🔥 Recommended: ${recommended}` : '';
+    }
+    window.onload = showRecommendation;
+  </script>
